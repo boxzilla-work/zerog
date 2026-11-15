@@ -362,30 +362,31 @@ jobs:
     needs: publish-release
     if: startsWith(github.ref, 'refs/tags/v') && !(github.event_name == 'workflow_dispatch' && inputs.r2_test == true)
     steps:
-      # Pushing to the tap repository needs a token with contents write access
-      # to it; the default GITHUB_TOKEN only covers this repository.
-      - name: Check tap token
-        id: tap-token
+      # Pushing to the tap repository needs write access to it; the default
+      # GITHUB_TOKEN only covers this repository. HOMEBREW_TAP_DEPLOY_KEY is
+      # the private half of a read-write deploy key on the tap.
+      - name: Check tap deploy key
+        id: tap-key
         env:
-          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          TAP_KEY: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
         run: |
-          if [ -z "$TAP_TOKEN" ]; then
-            echo "::warning::HOMEBREW_TAP_TOKEN is not set; the Homebrew cask was not updated"
+          if [ -z "$TAP_KEY" ]; then
+            echo "::warning::HOMEBREW_TAP_DEPLOY_KEY is not set; the Homebrew cask was not updated"
             echo "available=false" >> "$GITHUB_OUTPUT"
           else
             echo "available=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Checkout tap
-        if: steps.tap-token.outputs.available == 'true'
+        if: steps.tap-key.outputs.available == 'true'
         uses: actions/checkout@v4
         with:
           repository: ${{ github.repository_owner }}/homebrew-tap
-          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          ssh-key: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
           path: homebrew-tap
 
       - name: Point the cask at this release
-        if: steps.tap-token.outputs.available == 'true'
+        if: steps.tap-key.outputs.available == 'true'
         env:
           TAG_NAME: ${{ github.ref_name }}
           REPO_NAME: ${{ github.repository }}
